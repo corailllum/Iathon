@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 # Emotion Recognition
 
 Modèle ResNet50 fine-tuné pour reconnaître 7 émotions.
@@ -45,6 +45,4 @@ with torch.no_grad():
 print(f"Emotion: {emotion}")
 ```
 
-=======
-# Iathon
->>>>>>> ecb612e0b262ceb22e2940752424b31f39c5add7
+
