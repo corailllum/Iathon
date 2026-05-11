@@ -5,15 +5,11 @@ import numpy as np
 import joblib
 import mediapipe as mp
 
-# =========================================================
-# DEVICE
-# =========================================================
+# device
 device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 print("Device:", device)
 
-# =========================================================
-# LOAD CHECKPOINT
-# =========================================================
+#chargement checkpoint
 checkpoint = torch.load("mlp_best.pt", map_location=device)
 
 input_dim = checkpoint["input_dim"]
@@ -22,15 +18,11 @@ n_classes = checkpoint["num_classes"]
 print("Input shape:", input_dim)
 print("Classes:", n_classes)
 
-# =========================================================
-# LOAD SCALER + LABELS
-# =========================================================
+#chargement scaler et encoder
 scaler = joblib.load("scaler.joblib")
 label_encoder = joblib.load("label_encoder.joblib")
 
-# =========================================================
-# MODEL
-# =========================================================
+#modèle
 class MLP(nn.Module):
 
     def __init__(self):
@@ -59,18 +51,14 @@ class MLP(nn.Module):
 
 model = MLP().to(device)
 
-# =========================================================
-# LOAD WEIGHTS
-# =========================================================
+# poids
 model.load_state_dict(checkpoint["model_state_dict"])
 
 model.eval()
 
 print("Model loaded successfully")
 
-# =========================================================
-# MEDIAPIPE
-# =========================================================
+#mediapipe
 mp_face_mesh = mp.solutions.face_mesh
 
 face_mesh = mp_face_mesh.FaceMesh(
@@ -80,17 +68,13 @@ face_mesh = mp_face_mesh.FaceMesh(
     min_detection_confidence=0.5
 )
 
-# =========================================================
-# CAMERA
-# =========================================================
+#camera
 cap = cv2.VideoCapture(1, cv2.CAP_AVFOUNDATION)
 
 print("Camera started")
 print("Press Q to quit")
 
-# =========================================================
-# MAIN LOOP
-# =========================================================
+# main
 while True:
 
     ret, frame = cap.read()
@@ -117,16 +101,12 @@ while True:
 
         features = np.array(coords).reshape(1, -1)
 
-        # =================================================
-        # SCALE
-        # =================================================
+        # scale
         features = scaler.transform(features)
 
         x = torch.tensor(features, dtype=torch.float32).to(device)
 
-        # =================================================
-        # PREDICT
-        # =================================================
+        #predict
         with torch.no_grad():
 
             outputs = model(x)
@@ -141,9 +121,7 @@ while True:
 
             text = f"{emotion} ({confidence:.2f})"
 
-        # =================================================
-        # DRAW LANDMARKS
-        # =================================================
+        #dessin landmarks
         h, w, _ = frame.shape
 
         for lm in landmarks:
@@ -153,9 +131,7 @@ while True:
 
             cv2.circle(frame, (x_lm, y_lm), 1, (0, 255, 0), -1)
 
-    # =====================================================
-    # DISPLAY
-    # =====================================================
+    #display
     cv2.putText(
         frame,
         text,
@@ -168,15 +144,11 @@ while True:
 
     cv2.imshow("Emotion Recognition", frame)
 
-    # =====================================================
-    # QUIT
-    # =====================================================
+    # quitt
     if cv2.waitKey(1) & 0xFF == ord("q"):
         break
 
-# =========================================================
-# CLEANUP
-# =========================================================
+#nettoyage
 cap.release()
 cv2.destroyAllWindows()
 face_mesh.close()
