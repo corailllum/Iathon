@@ -1,0 +1,88 @@
+{
+  "timestamp": "2026-05-07T12:10:31.678530",
+  "best_val_accuracy": 0.7352084379708689,
+  "per_class_accuracy": {
+    "angry": 0.6300675675675675,
+    "disgust": 0.8809121621621622,
+    "fear": 0.4839527027027027,
+    "happy": 0.8775778850372971,
+    "neutral": 0.7232088181261482,
+    "sad": 0.62203519510329,
+    "surprise": 0.8133445945945946
+  },
+  "best_emotion": "disgust",
+  "worst_emotion": "fear",
+  "classification_report": {
+    "angry": {
+      "precision": 0.5869394177812746,
+      "recall": 0.6300675675675675,
+      "f1-score": 0.6077393075356415,
+      "support": 1184.0
+    },
+    "disgust": {
+      "precision": 0.8598516075845012,
+      "recall": 0.8809121621621622,
+      "f1-score": 0.8702544847726325,
+      "support": 1184.0
+    },
+    "fear": {
+      "precision": 0.5993723849372385,
+      "recall": 0.4839527027027027,
+      "f1-score": 0.5355140186915888,
+      "support": 1184.0
+    },
+    "happy": {
+      "precision": 0.9066183136899365,
+      "recall": 0.8775778850372971,
+      "f1-score": 0.8918617614269788,
+      "support": 2279.0
+    },
+    "neutral": {
+      "precision": 0.6583054626532887,
+      "recall": 0.7232088181261482,
+      "f1-score": 0.6892325649255909,
+      "support": 1633.0
+    },
+    "sad": {
+      "precision": 0.615442846328539,
+      "recall": 0.62203519510329,
+      "f1-score": 0.6187214611872146,
+      "support": 1307.0
+    },
+    "surprise": {
+      "precision": 0.8065326633165829,
+      "recall": 0.8133445945945946,
+      "f1-score": 0.8099243061396131,
+      "support": 1184.0
+    },
+    "accuracy": 0.7352084379708689,
+    "macro avg": {
+      "precision": 0.7190089566130516,
+      "recall": 0.7187284178991089,
+      "f1-score": 0.7176068435256086,
+      "support": 9955.0
+    },
+    "weighted avg": {
+      "precision": 0.7356275146890195,
+      "recall": 0.7352084379708689,
+      "f1-score": 0.7342724569844704,
+      "support": 9955.0
+    }
+  },
+  "config": {
+    "data_dir": "./archive(1)/processed_data",
+    "img_size": 48,
+    "batch_size": 64,
+    "num_epochs": 50,
+    "learning_rate": 0.001,
+    "weight_decay": 0.0001,
+    "dropout": 0.5,
+    "num_workers": 4,
+    "device": "cuda",
+    "save_dir": "./models",
+    "results_dir": "./results",
+    "early_stopping_patience": 10,
+    "test_split": 0.2,
+    "random_seed": 42
+  }
+}
