@@ -75,8 +75,8 @@ for i in range(len(X)):
 df_aug = pd.DataFrame(augmented_X)
 df_aug["emotion"] = augmented_y
 
-df_aug.to_csv("dataset_augmented.csv", index=False)
+df_aug.to_csv("custom_dataset_augmented.csv", index=False)
 
-print("Saved: dataset_augmented.csv")
+print("Saved: custom_dataset_augmented.csv")
 print("Original size:", len(df))
 print("Augmented size:", len(df_aug))
