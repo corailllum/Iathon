@@ -1,4 +1,6 @@
-pycache/
+__pycache__/
+*.py[cod]
+.pyc
 archive(1)/
 archive(1).zip
 

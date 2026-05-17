@@ -26,6 +26,12 @@ def _project_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
+_FACE_LANDMARKER_TASK_URL = (
+    "https://storage.googleapis.com/mediapipe-models/face_landmarker/"
+    "face_landmarker/float16/latest/face_landmarker.task"
+)
+
+
 def _mean(seq) -> Optional[float]:
     if not seq:
         return None
@@ -79,6 +85,24 @@ class Vision:
         self._tl_weights_path = _project_root() / "models" / "transfer_learning" / "best_model.pth"
         self._tl_transform: Optional[Any] = None
 
+        self._lm_lock = threading.Lock()
+        self._lm_ready = False
+        self._lm_failed = False
+        self._lm_error_msg = ""
+        self._lm_face_mesh = None
+        self._lm_model = None
+        self._lm_scaler = None
+        self._lm_label_encoder = None
+        self._lm_device: Optional[str] = None
+        self._lm_weights_path = _project_root() / "models" / "landmarks" / "mlp_best.pt"
+        self._lm_scaler_path = _project_root() / "models" / "landmarks" / "scaler.joblib"
+        self._lm_le_path = _project_root() / "models" / "landmarks" / "label_encoder.joblib"
+        self._lm_task_model_path = _project_root() / "models" / "landmarks" / "face_landmarker.task"
+        self._lm_use_tasks_api = False
+        self._lm_landmarker = None
+        self._lm_ts_ms = 0
+        self._lm_input_dim: Optional[int] = None
+
         self._try_load_offline_cnn_report()
 
     def _try_load_offline_cnn_report(self) -> None:
@@ -112,7 +136,6 @@ class Vision:
             return torch.load(str(path), map_location=device)
 
     def get_live_metrics(self) -> Dict[str, Any]:
-        """Lecture thread-safe pour l’UI (performances temps réel + stats offline CNN)."""
         with self._metrics_lock:
             proc = list(self._process_times)
             inf = list(self._infer_times)
@@ -322,6 +345,147 @@ class Vision:
                 self._tl_error_msg = str(e)
                 return False
 
+    def _download_face_landmarker_model_if_needed(self) -> None:
+        if self._lm_task_model_path.is_file():
+            return
+        self._lm_task_model_path.parent.mkdir(parents=True, exist_ok=True)
+        import urllib.request
+
+        try:
+            urllib.request.urlretrieve(_FACE_LANDMARKER_TASK_URL, self._lm_task_model_path)
+        except Exception as e:
+            raise RuntimeError(
+                f"Téléchargement du modèle Face Landmarker impossible. "
+                f"Enregistrez le fichier .task manuellement sous :\n{self._lm_task_model_path}\n"
+                f"URL : {_FACE_LANDMARKER_TASK_URL}\n({e})"
+            ) from e
+
+    def _ensure_landmarks(self) -> bool:
+        with self._lm_lock:
+            if self._lm_ready:
+                return True
+            if self._lm_failed:
+                return False
+
+            try:
+                import joblib
+            except ImportError:
+                self._lm_failed = True
+                self._lm_error_msg = "Installez joblib: pip install joblib"
+                return False
+
+            try:
+                import mediapipe as mp
+            except ImportError:
+                self._lm_failed = True
+                self._lm_error_msg = "Installez mediapipe: pip install mediapipe"
+                return False
+
+            if not self._import_torch_if_needed():
+                self._lm_failed = True
+                self._lm_error_msg = "Installez PyTorch pour le mode Landmarks"
+                return False
+
+            if not self._lm_weights_path.is_file():
+                self._lm_failed = True
+                self._lm_error_msg = f"Modèle absent: {self._lm_weights_path}"
+                return False
+            if not self._lm_scaler_path.is_file():
+                self._lm_failed = True
+                self._lm_error_msg = f"Scaler absent: {self._lm_scaler_path}"
+                return False
+            if not self._lm_le_path.is_file():
+                self._lm_failed = True
+                self._lm_error_msg = f"Label encoder absent: {self._lm_le_path}"
+                return False
+
+            torch = self._torch
+            import torch.nn as nn
+
+            try:
+                if torch.cuda.is_available():
+                    device = "cuda"
+                elif getattr(torch.backends, "mps", None) is not None and torch.backends.mps.is_available():
+                    device = "mps"
+                else:
+                    device = "cpu"
+
+                ckpt = self._torch_load_file(self._lm_weights_path, device)
+                if not isinstance(ckpt, dict) or "model_state_dict" not in ckpt:
+                    raise RuntimeError("Checkpoint Landmarks invalide (mlp_best.pt)")
+
+                input_dim = int(ckpt["input_dim"])
+                num_classes = int(ckpt["num_classes"])
+
+                scaler = joblib.load(self._lm_scaler_path)
+                label_encoder = joblib.load(self._lm_le_path)
+
+                class _LandmarksMLP(nn.Module):
+                    def __init__(self, in_dim: int, n_cls: int):
+                        super().__init__()
+                        self.net = nn.Sequential(
+                            nn.Linear(in_dim, 256),
+                            nn.BatchNorm1d(256),
+                            nn.ReLU(),
+                            nn.Dropout(0.3),
+                            nn.Linear(256, 128),
+                            nn.BatchNorm1d(128),
+                            nn.ReLU(),
+                            nn.Dropout(0.3),
+                            nn.Linear(128, 64),
+                            nn.ReLU(),
+                            nn.Linear(64, n_cls),
+                        )
+
+                    def forward(self, x: Any) -> Any:
+                        return self.net(x)
+
+                model = _LandmarksMLP(input_dim, num_classes).to(device)
+                model.load_state_dict(ckpt["model_state_dict"])
+                model.eval()
+
+                self._lm_model = model
+                self._lm_scaler = scaler
+                self._lm_label_encoder = label_encoder
+                self._lm_device = device
+                self._lm_input_dim = input_dim
+
+                self._lm_use_tasks_api = not hasattr(mp, "solutions")
+                if self._lm_use_tasks_api:
+                    self._download_face_landmarker_model_if_needed()
+                    from mediapipe.tasks.python import vision as mp_tasks_vision
+                    from mediapipe.tasks.python.core import base_options as mp_tasks_base
+
+                    opts = mp_tasks_vision.FaceLandmarkerOptions(
+                        base_options=mp_tasks_base.BaseOptions(
+                            model_asset_path=str(self._lm_task_model_path)
+                        ),
+                        running_mode=mp_tasks_vision.RunningMode.VIDEO,
+                        num_faces=1,
+                        min_face_detection_confidence=0.5,
+                        min_face_presence_confidence=0.5,
+                        min_tracking_confidence=0.5,
+                    )
+                    self._lm_landmarker = mp_tasks_vision.FaceLandmarker.create_from_options(opts)
+                    self._lm_face_mesh = None
+                    self._lm_ts_ms = 0
+                else:
+                    self._lm_landmarker = None
+                    self._lm_face_mesh = mp.solutions.face_mesh.FaceMesh(
+                        static_image_mode=False,
+                        max_num_faces=1,
+                        refine_landmarks=True,
+                        min_detection_confidence=0.5,
+                        min_tracking_confidence=0.5,
+                    )
+
+                self._lm_ready = True
+                return True
+            except Exception as e:
+                self._lm_failed = True
+                self._lm_error_msg = str(e)
+                return False
+
     def _tensor_from_face_bgr_cnn(self, face_bgr: np.ndarray) -> Any:
         face_rgb = cv2.cvtColor(face_bgr, cv2.COLOR_BGR2RGB)
         return self._cnn_transform(face_rgb).unsqueeze(0)
@@ -360,10 +524,6 @@ class Vision:
         return rgb
 
     def process(self, frame, ai_model: str = "Landmarks"):
-        """
-        Traite une frame BGR OpenCV.
-        Retourne (frame_rgb_annotée, crop_visage_rgb_ou_None).
-        """
         t_start = time.perf_counter()
         try:
             frame = cv2.resize(frame, (640, 480))
@@ -484,22 +644,95 @@ class Vision:
 
                 return rgb, face_crop
 
+            if ai_model == "Landmarks":
+                if not self._ensure_landmarks():
+                    err = self._lm_error_msg or "Landmarks indisponible"
+                    cv2.putText(
+                        rgb,
+                        f"LM: {err[:80]}",
+                        (8, 22),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.45,
+                        (255, 80, 80),
+                        1,
+                        cv2.LINE_AA,
+                    )
+                    self._clear_live_prediction()
+                    return rgb, None
+
+                torch = self._torch
+                F = self._torch_F
+
+                h, w = rgb.shape[:2]
+
+                if self._lm_use_tasks_api:
+                    import mediapipe as mp
+
+                    rgb_c = np.ascontiguousarray(rgb)
+                    self._lm_ts_ms = int(time.perf_counter() * 1000)
+                    mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_c)
+                    det = self._lm_landmarker.detect_for_video(mp_image, self._lm_ts_ms)
+                    if not det.face_landmarks:
+                        self._clear_live_prediction()
+                        return rgb, None
+                    lm_iter = det.face_landmarks[0]
+                else:
+                    mp_results = self._lm_face_mesh.process(rgb)
+                    if not mp_results.multi_face_landmarks:
+                        self._clear_live_prediction()
+                        return rgb, None
+                    lm_iter = mp_results.multi_face_landmarks[0].landmark
+
+                coords: List[float] = []
+                xs: List[float] = []
+                ys: List[float] = []
+                for lm in lm_iter:
+                    fx = float(lm.x)
+                    fy = float(lm.y)
+                    coords.extend((fx, fy))
+                    xs.append(fx * w)
+                    ys.append(fy * h)
+
+                features = np.asarray(coords, dtype=np.float64).reshape(1, -1)
+                if features.shape[1] != int(self._lm_input_dim):
+                    self._clear_live_prediction()
+                    return rgb, None
+
+                try:
+                    features_s = self._lm_scaler.transform(features)
+                except Exception:
+                    self._clear_live_prediction()
+                    return rgb, None
+
+                t_inf0 = time.perf_counter()
+                with torch.no_grad():
+                    x = torch.from_numpy(features_s.astype(np.float32)).to(self._lm_device)
+                    out = self._lm_model(x)
+                    probs = F.softmax(out, dim=1).cpu().numpy()[0]
+                t_inf1 = time.perf_counter()
+                self._record_infer_ms((t_inf1 - t_inf0) * 1000.0)
+
+                idx = int(np.argmax(probs))
+                confidence = float(probs[idx])
+                raw_label = self._lm_label_encoder.inverse_transform([idx])[0]
+                emotion = str(raw_label).strip().lower()
+
+                self._record_prediction(emotion, confidence)
+
+                x1, x2 = int(min(xs)), int(max(xs))
+                y1, y2 = int(min(ys)), int(max(ys))
+                span = max(x2 - x1, y2 - y1, 8)
+                pad = max(4, int(0.06 * span))
+                x1 = max(0, x1 - pad)
+                y1 = max(0, y1 - pad)
+                x2 = min(w - 1, x2 + pad)
+                y2 = min(h - 1, y2 + pad)
+
+                self._draw_emotion_face(rgb, x1, y1, x2, y2, emotion, confidence)
+                face_crop = rgb[y1:y2, x1:x2] if y2 > y1 and x2 > x1 else None
+                return rgb, face_crop
+
             self._clear_live_prediction()
-
-            for (x, y, w, h) in faces:
-                cv2.rectangle(rgb, (x, y), (x + w, y + h), (0, 255, 0), 2)
-                cv2.putText(
-                    rgb,
-                    "Calm",
-                    (x, y - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.7,
-                    (0, 255, 0),
-                    2,
-                )
-                face_crop = rgb[y : y + h, x : x + w]
-                break
-
-            return rgb, face_crop
+            return rgb, None
         finally:
             self._record_process_ms((time.perf_counter() - t_start) * 1000.0)

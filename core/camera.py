@@ -71,18 +71,13 @@ class Camera:
 
     @staticmethod
     def detect_available_devices(max_devices: int = 10, start_index: int = 0):
-        """
-        Retourne la liste des indices de caméras détectées.
-        Méthode simple basée sur l'ouverture de `cv2.VideoCapture`.
-        """
         available = []
 
         for i in range(start_index, start_index + max_devices):
             cap = None
             try:
-                # Sur Windows, CAP_DSHOW est souvent plus rapide/stable.
                 try:
-                    cap = cv2.VideoCapture(i, cv2.CAP_DSHOW)  # type: ignore[attr-defined]
+                    cap = cv2.VideoCapture(i, cv2.CAP_DSHOW)
                 except Exception:
                     cap = cv2.VideoCapture(i)
 
