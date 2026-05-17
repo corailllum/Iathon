@@ -39,7 +39,7 @@ CONFIG = {
     "save_dir": "./models",
     "results_dir": "./results",
     "early_stopping_patience": 10,
-    "test_split": 0.2,  # fraction du test split
+    "test_split": 0.2,  # test split
     "random_seed": 42,
 }
 
@@ -132,7 +132,7 @@ def get_dataloaders():
         pin_memory=True
     )
 
-    print(f"✅ Dataset chargé:")
+    print(f" Dataset chargé:")
     print(f"   Train: {len(train_indices)} images")
     print(f"   Test:  {len(test_indices)} images")
     print(f"   Classes: {full_dataset.classes}")
@@ -309,7 +309,7 @@ def train(model, train_loader, test_loader, classes):
     history = {"train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []}
     best_acc = 0.0
 
-    print(f"\n🚀 Entraînement sur {device.upper()}")
+    print(f"\n Entraînement sur {device.upper()}")
     print(f"   Modèle: {sum(p.numel() for p in model.parameters()):,} paramètres")
     print("=" * 70)
 
@@ -338,14 +338,14 @@ def train(model, train_loader, test_loader, classes):
                 "classes": classes,
                 "config": CONFIG,
             }, os.path.join(CONFIG["save_dir"], "best_model.pth"))
-            print(f"   💾 Meilleur modèle sauvegardé (acc={best_acc:.4f})")
+            print(f"    Meilleur modèle sauvegardé (acc={best_acc:.4f})")
 
         early_stopping(val_loss)
         if early_stopping.should_stop:
-            print(f"\n⏹️  Early stopping à l'epoch {epoch}")
+            print(f"\n⏹  Early stopping à l'epoch {epoch}")
             break
 
-    print(f"\n✅ Entraînement terminé. Meilleure accuracy: {best_acc:.4f}")
+    print(f"\n Entraînement terminé. Meilleure accuracy: {best_acc:.4f}")
     return history, best_acc
 
 
@@ -372,7 +372,7 @@ def analyze_metrics(model, test_loader, classes, device, history):
         output_dict=True
     )
     print("\n" + "=" * 70)
-    print("📊 RAPPORT DE CLASSIFICATION")
+    print(" RAPPORT DE CLASSIFICATION")
     print("=" * 70)
     print(classification_report(all_labels, all_preds, target_names=classes))
 
@@ -387,13 +387,13 @@ def analyze_metrics(model, test_loader, classes, device, history):
     best_emotion = max(per_class_acc, key=per_class_acc.get)
     worst_emotion = min(per_class_acc, key=per_class_acc.get)
 
-    print("\n🏆 ANALYSE PAR ÉMOTION:")
+    print("\n ANALYSE PAR ÉMOTION:")
     for emotion, acc in sorted(per_class_acc.items(), key=lambda x: -x[1]):
         bar = "█" * int(acc * 20) + "░" * (20 - int(acc * 20))
         print(f"  {emotion:10s} [{bar}] {acc:.1%}")
 
-    print(f"\n  ✅ Meilleure reconnaissance: {best_emotion} ({per_class_acc[best_emotion]:.1%})")
-    print(f"  ⚠️  Moins bien reconnue:     {worst_emotion} ({per_class_acc[worst_emotion]:.1%})")
+    print(f"\n   Meilleure reconnaissance: {best_emotion} ({per_class_acc[best_emotion]:.1%})")
+    print(f"    Moins bien reconnue:     {worst_emotion} ({per_class_acc[worst_emotion]:.1%})")
 
     # ── 3. Figures ────────────────────────────────
     fig, axes = plt.subplots(2, 3, figsize=(18, 12))
@@ -508,6 +508,6 @@ if __name__ == "__main__":
 
     analyze_metrics(model, test_loader, classes, CONFIG["device"], history)
 
-    print("\n✅ Pipeline terminé!")
+    print("\n Pipeline terminé!")
     print(f"   Modèle: {CONFIG['save_dir']}/best_model.pth")
     print(f"   Résultats: {CONFIG['results_dir']}/")

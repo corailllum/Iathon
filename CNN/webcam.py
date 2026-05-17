@@ -14,7 +14,7 @@ import os
 
 # Importer le modèle depuis train.py
 sys.path.append(os.path.dirname(__file__))
-from train import EmotionCNN
+from CNN.CNN import EmotionCNN
 
 
 # ─────────────────────────────────────────────
@@ -52,7 +52,7 @@ def load_model(model_path: str, device: str):
     model.to(device)
     model.eval()
 
-    print(f"✅ Modèle chargé: {model_path}")
+    print(f" Modèle chargé: {model_path}")
     print(f"   Classes: {classes}")
     print(f"   Accuracy val: {checkpoint.get('val_acc', 'N/A'):.4f}")
     return model, classes
@@ -167,9 +167,9 @@ def run_webcam(model, classes, device, camera_id=0):
     cap.set(cv2.CAP_PROP_FPS, 30)
 
     if not cap.isOpened():
-        raise RuntimeError(f"❌ Impossible d'ouvrir la caméra {camera_id}")
+        raise RuntimeError(f" Impossible d'ouvrir la caméra {camera_id}")
 
-    print(f"\n🎥 Webcam démarrée (caméra {camera_id})")
+    print(f"\n Webcam démarrée (caméra {camera_id})")
     print("   Appuyez sur 'q' pour quitter | 's' pour screenshot")
     print()
 
@@ -246,14 +246,14 @@ def run_webcam(model, classes, device, camera_id=0):
             ts = time.strftime("%Y%m%d_%H%M%S")
             path = f"screenshot_{ts}.jpg"
             cv2.imwrite(path, frame)
-            print(f"📸 Screenshot sauvegardé: {path}")
+            print(f" Screenshot sauvegardé: {path}")
 
     cap.release()
     cv2.destroyAllWindows()
 
     # Stats de session
     if emotion_history:
-        print("\n📊 STATISTIQUES DE SESSION:")
+        print("\n STATISTIQUES DE SESSION:")
         from collections import Counter
         counts = Counter(emotion_history)
         total = sum(counts.values())
@@ -278,7 +278,7 @@ if __name__ == "__main__":
     else:
         device = args.device
 
-    print("🎭 Emotion Recognition - Webcam Temps Réel")
+    print(" Emotion Recognition - Webcam Temps Réel")
     print("=" * 50)
     print(f"   Device: {device.upper()}")
 

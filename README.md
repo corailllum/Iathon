@@ -1,42 +1,46 @@
 # IAthon
-## Equipe 1 : 
+### Équipe 1 :
 - **Charlotte Chanudet**
 - **Mahaut Galice**
-- **AMAL OUEDRAOGO**
-- **Colin POULIART**
+- **Amal Ouedraogo**
+- **Colin Pouliart**
 
-# Explication du projet
-Ce projet fais partie du IAthon organisée par l'iuniversité du quebec a Chicoutimi et du ecole louvain en hainaut. Nous avonsn choisi de réalisée le projet de reconnaissance des émotions chez les enfants. Ce README regroupe les information sur les données utilisée et modele d'ia mis en place, ainsi qu'un mode d'emploie pour les differents fichier.
+## Explication du projet
+Ce projet fait partie de l'IAthon organisé par l'Université du Québec à Chicoutimi et l'École Louvain en Hainaut. Nous avons choisi de réaliser un projet de reconnaissance des émotions chez les enfants. Ce README regroupe les informations sur les données utilisées et les modèles d'IA mis en place, ainsi qu'un mode d'emploi pour les différents fichiers.
 
-
-# Technologies utilisées
+## Technologies utilisées
 - Python 3.10+
 - PyTorch (torch, torchvision)
 - Streamlit (interface web)
 - OpenCV, Pillow (traitement d'image)
 - streamlit-webrtc (webcam temps réel)
+- Tkinter
 
-# Structure du projet
-- `transfer_learning/` : Code principal, modèle, requirements, documentation
-- `train.py` : Script d'entraînement
-- `webcam.py` : Script de détection via webcam (hors Streamlit)
+## Structure du projet
+- `CNN/` : Code et sauvegarde du modèle CNN
+- `transfer_learning/` : Code et sauvegarde du modèle ResNet50
+- `landmarks/` : Code, sauvegarde et données du modèle landmarks
+- `interface/` : Code principal et front de l'application
 
+Chacun des dossiers possède un README qui détaille le fonctionnement des modèles ou du code présent dans le dossier.
 
-# Explication des modèles
-Le modèle utilisé est un réseau de neurones convolutif (CNN) de type **ResNet50** :
+## Données utilisées
 
-- **ResNet50** est un modèle profond composé de 50 couches, conçu pour l’analyse d’images. Il utilise des blocs résiduels qui facilitent l’entraînement de réseaux très profonds en permettant le passage direct de l’information entre les couches.
-- **Pré-entraînement** : Le modèle est d’abord entraîné sur ImageNet (14 millions d’images, 1000 classes) pour apprendre des caractéristiques générales des images.
-- **Fine-tuning** : On adapte ensuite la dernière couche du modèle pour prédire 7 émotions. Seules les dernières couches (Layer4 + fully connected) sont réentraînées sur notre jeu de données d’émotions, les autres couches restent figées.
-- **Entrée** : Une image couleur (RGB) de taille 224x224 pixels, normalisée selon les statistiques d’ImageNet.
-- **Sortie** : Un vecteur de 7 scores (logits), un par émotion. On applique une fonction softmax pour obtenir les probabilités, puis on retient l’émotion avec la probabilité la plus élevée.
-- **Utilisation** : Le modèle est utilisé via Streamlit pour la détection en temps réel (webcam) ou sur image uploadée.
+### Structure du dataset
 
-**Résumé du pipeline :**
-1. L’image est redimensionnée et normalisée.
-2. Elle passe dans le ResNet50 (toutes les couches convolutives extraites, puis la couche finale adaptée).
-3. Le modèle prédit la probabilité de chaque émotion.
-4. L’émotion dominante est affichée à l’utilisateur.
+Lien du dataset :
 
-# Mode d'emploi
+```
+data/
+│── angry/
+│── disgust/
+│── fear/
+│── happy/
+│── neutral/
+│── sad/
+│── surprise/
+```
+
+Cela ne concerne pas le dossier `landmarks/` qui utilise son propre dataset fait main.
+
 
